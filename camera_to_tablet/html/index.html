@@ -23,17 +23,9 @@
         var subscriberID = cameraProxy.unsubscribe(image_id).done(function (id) {
           console.log("unsubscribe done.." );
         });
-     };
-
-      function startCaptureHandler(image) {
-        console.log("stopCaptureイベント発生: " );
-        memory.getData("myimage").done(image)
-        {
-          console.log("size:" + image);
-        }
       };
       
-      function initialize() {
+      function setupDecodeMap() {
         var symbols = [];
         var startChar = "A".charCodeAt(0);
         for(var i = 0; i < 26; i++) {
@@ -57,7 +49,8 @@
       };
 
       function startSubscribe() {
-        initialize();
+
+        setupDecodeMap();
         cv = document.getElementById('test1');
 
         // Canvasのコンテキスト取得
@@ -67,13 +60,11 @@
 
         for (i = 0;i < 480;i++) {
           for (j = 0;j < 640;j++) {
-
             // アルファ成分
             imgData.data[3 + j * 4 + i * imgData.width * 4] = 255;
 
           }
         }
-
 
         session.service("ALMemory").done(function (ALMemory) {
           console.log("ALMemory取得成功");
@@ -82,11 +73,7 @@
             subscriber.signal.connect(stopCaptureHandler);
           });
 
-          ALMemory.subscriber("startCapture").done(function(subscriber) {
-            subscriber.signal.connect(startCaptureHandler);
-          });
         });
-
 
         session.service("ALVideoDevice").done(function (_cameraProxy) {
           var fps = 5;
@@ -117,6 +104,8 @@
 */
           p = 0;
           // 各ピクセルの色情報設定
+          // Base64 をデコードして１ピクセルづつつめる、、、
+
           for (i = 0;i < 480;i++) {
             for (j = 0;j < 640;j++) {
 
@@ -128,17 +117,6 @@
               p++;
               var b3 = decodeMap[ref[p]];
               p++;
-              /*
-              var d0 = ((b0 << 2) + (b1 >> 4)) & 0xff;
-              
-              if(b2 == null) break; // encoded[i + 1] == "="
-              
-              var d1 = ((b1 << 4) + (b2 >> 2)) & 0xff;
-              
-              if(b3 == null) break; // encoded[i + 2] == "="
-              
-              var d2 = ((b2 << 6) + b3) & 0xff;
-              */
 
               // 青成分
               imgData.data[2 + j * 4 + i * imgData.width * 4] = ((b2 << 6) + b3) & 0xff;
@@ -153,7 +131,7 @@
             }
           }
 
-          // CanvasのコンテキストにImageDataを設定
+          // 描画
           context.putImageData(imgData, 0, 0);
         }
 
