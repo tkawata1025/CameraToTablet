@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <title>QiMessaging (メモリを監視)</title>
+    <script src="/libs/qimessaging/1.0/qimessaging.js"></script>
+    <script>
+      var session = new QiSession();
+      var context = null;
+      var imgData = null;
+      var cv = null;
+      var ref = null;
+      var memory = null;
+      var cameraProxy = null;
+      
+      var decodeMap = [];
+      var image_id = null;
+      var cont = true;
+
+      function stopCaptureHandler(image) {
+        console.log("stopCaptureイベント発生: " );
+        cont = false;
+        var subscriberID = cameraProxy.unsubscribe(image_id).done(function (id) {
+          console.log("unsubscribe done.." );
+        });
+     };
+
+      function startCaptureHandler(image) {
+        console.log("stopCaptureイベント発生: " );
+        memory.getData("myimage").done(image)
+        {
+          console.log("size:" + image);
+        }
+      };
+      
+      function initialize() {
+        var symbols = [];
+        var startChar = "A".charCodeAt(0);
+        for(var i = 0; i < 26; i++) {
+          symbols.push(String.fromCharCode(startChar + i));
+        }
+        var startChar = "a".charCodeAt(0);
+        for(var i = 0; i < 26; i++) {
+          symbols.push(String.fromCharCode(startChar + i));
+        }
+        var startChar = "0".charCodeAt(0);
+        for(var i = 0; i < 10; i++) {
+          symbols.push(String.fromCharCode(startChar + i));
+        }
+        symbols.push("+", "/");
+        
+        decodeMap = [];
+        for(var i = 0; i < symbols.length; i++) {
+          decodeMap[symbols[i]] = i;
+        }
+        decodeMap["="] = null;
+      };
+
+      function startSubscribe() {
+        initialize();
+        cv = document.getElementById('test1');
+
+        // Canvasのコンテキスト取得
+        context = cv.getContext('2d');
+        // ImageDataオブジェクト作成
+        imgData = context.createImageData(640, 480);
+
+        for (i = 0;i < 480;i++) {
+          for (j = 0;j < 640;j++) {
+
+            // アルファ成分
+            imgData.data[3 + j * 4 + i * imgData.width * 4] = 255;
+
+          }
+        }
+
+
+        session.service("ALMemory").done(function (ALMemory) {
+          console.log("ALMemory取得成功");
+          memory = ALMemory;
+          ALMemory.subscriber("stopCapture").done(function(subscriber) {
+            subscriber.signal.connect(stopCaptureHandler);
+          });
+
+          ALMemory.subscriber("startCapture").done(function(subscriber) {
+            subscriber.signal.connect(startCaptureHandler);
+          });
+        });
+
+
+        session.service("ALVideoDevice").done(function (_cameraProxy) {
+          var fps = 5;
+          cameraProxy = _cameraProxy;
+          // The subscriberID can be altered if other instances are already running
+          console.log("1");
+          var subscriberID = "toTablet";
+          subscriberID = cameraProxy.subscribe(subscriberID, 2, 11, fps).done(function (id) {
+            console.log("2" + subscriberID + "," + id);
+            image_id = id;
+               setTimeout( "updateImage()", 100 );
+
+        });
+      });
+    }
+
+    function updateImage()
+    {
+        cameraProxy.getImageRemote(image_id).done(function(image) {
+        ref = image[6];
+
+        if (ref && cv.getContext && cv.getContext('2d').createImageData) {
+
+/*        var images = document.getElementById('images');
+          こんな感じでできれば理想だが、、、
+
+          images.src = "data:image/image/bmp;base64," + image[6];
+*/
+          p = 0;
+          // 各ピクセルの色情報設定
+          for (i = 0;i < 480;i++) {
+            for (j = 0;j < 640;j++) {
+
+              var b0 = decodeMap[ref[p]];
+              p++;
+              var b1 = decodeMap[ref[p]];
+              p++;
+              var b2 = decodeMap[ref[p]];
+              p++;
+              var b3 = decodeMap[ref[p]];
+              p++;
+              /*
+              var d0 = ((b0 << 2) + (b1 >> 4)) & 0xff;
+              
+              if(b2 == null) break; // encoded[i + 1] == "="
+              
+              var d1 = ((b1 << 4) + (b2 >> 2)) & 0xff;
+              
+              if(b3 == null) break; // encoded[i + 2] == "="
+              
+              var d2 = ((b2 << 6) + b3) & 0xff;
+              */
+
+              // 青成分
+              imgData.data[2 + j * 4 + i * imgData.width * 4] = ((b2 << 6) + b3) & 0xff;
+              // 緑成分
+              imgData.data[1 + j * 4 + i * imgData.width * 4] = ((b1 << 4) + (b2 >> 2)) & 0xff;
+              // 赤成分
+              imgData.data[j * 4 + i * imgData.width * 4] = ((b0 << 2) + (b1 >> 4)) & 0xff;
+
+              // アルファ成分
+              //imgData.data[3 + j * 4 + i * imgData.width * 4] = 255;
+
+            }
+          }
+
+          // CanvasのコンテキストにImageDataを設定
+          context.putImageData(imgData, 0, 0);
+        }
+
+
+        cameraProxy.releaseImage(image_id);
+
+        if (cont)
+          setTimeout( "updateImage()", 10 );
+      });
+    }
+
+    </script>
+   
+  </head>
+  <body onLoad="startSubscribe();">
+
+  <!-- <img id="images" width="640" height="480"></img> -->
+
+  <canvas id="test1" width="640" height="480"></canvas>
+
+<script type="text/javascript">
+
+</script> 
+  </body>
+</html>
